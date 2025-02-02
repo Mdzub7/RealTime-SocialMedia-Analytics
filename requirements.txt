@@ -1,0 +1,8 @@
+kafka-python
+apache-flink
+pandas
+scikit-learn
+flask
+streamlit
+nltk
+python-dotenv
