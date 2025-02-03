@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Twitter Sentiment Analysis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#1a1a1a',
+                        darkcard: '#2d2d2d',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .tweet-enter {
+            animation: slideIn 0.5s ease-out;
+        }
+        @keyframes slideIn {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+    </style>
+    <script>
+        // Add this function before socket initialization
+        function createTweetElement(data) {
+            const tweetDiv = document.createElement("div");
+            tweetDiv.classList.add(
+                "tweet-enter",
+                "p-4",
+                "rounded-lg",
+                "transition-all",
+                "duration-300"
+            );
+
+            // Set background color based on sentiment
+            if (data.sentiment === "Positive") {
+                tweetDiv.classList.add("bg-green-900/20", "border", "border-green-500/20");
+            } else if (data.sentiment === "Negative") {
+                tweetDiv.classList.add("bg-red-900/20", "border", "border-red-500/20");
+            } else {
+                tweetDiv.classList.add("bg-purple-900/20", "border", "border-purple-500/20");
+            }
+
+            tweetDiv.innerHTML = `
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="px-2 py-1 rounded text-sm ${
+                        data.sentiment === 'Positive' ? 'text-green-300' : 
+                        data.sentiment === 'Negative' ? 'text-red-300' : 'text-purple-300'
+                    }">
+                        ${data.sentiment}
+                    </span>
+                </div>
+                <p class="text-gray-200">${data.text}</p>
+            `;
+            return tweetDiv;
+        }
+
+        // Initialize socket connection
+        var socket = io({
+            transports: ['websocket'],
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000,
+            reconnectionAttempts: 5
+        });
+    
+        socket.on('connect', function() {
+            console.log('Connected to server');
+        });
+    
+        socket.on('disconnect', function() {
+            console.log('Disconnected from server');
+        });
+    
+        socket.on('error', function(error) {
+            console.error('Socket error:', error);
+        });
+    
+        // Load stored tweets when page loads
+        fetch("/get_tweets")
+            .then(response => response.json())
+            .then(tweets => {
+                console.log("Received historical tweets:", tweets);
+                const tweetsContainer = document.getElementById("tweets");
+                tweets.forEach(data => {
+                    tweetsContainer.appendChild(createTweetElement(data));
+                });
+            })
+            .catch(error => console.error("Error fetching tweets:", error));
+    
+        // Add a Set to track unique tweet IDs
+        const processedTweets = new Set();
+
+        // Handle new tweets
+        socket.on("new_tweet", function(data) {
+            console.log("New tweet received:", data);
+            // Check if we've already processed this tweet
+            if (!processedTweets.has(data.text)) {
+                processedTweets.add(data.text);
+                const tweetsContainer = document.getElementById("tweets");
+                const tweetElement = createTweetElement(data);
+                tweetsContainer.insertBefore(tweetElement, tweetsContainer.firstChild);
+
+                if (tweetsContainer.children.length > 10) {
+                    tweetsContainer.removeChild(tweetsContainer.lastChild);
+                }
+            }
+        });
+
+        // Load historical wordcloud on page load
+        fetch("/get_historical_wordcloud")
+            .then(response => response.json())
+            .then(data => {
+                updateWordcloud('historical-wordcloud', 'historical-wordcloud-placeholder', data.image);
+            })
+            .catch(error => console.error("Error loading historical wordcloud:", error));
+
+        // Update socket.io handler for word clouds
+        socket.on("wordcloud_update", function(data) {
+            console.log("Word cloud updates received:", data);
+            if (data.live_image) {
+                updateWordcloud('live-wordcloud', 'live-wordcloud-placeholder', data.live_image);
+            }
+            if (data.historical_image) {
+                updateWordcloud('historical-wordcloud', 'historical-wordcloud-placeholder', data.historical_image);
+            }
+        });
+
+        // Remove the old wordcloud handler and add this function
+        function updateWordcloud(imgId, placeholderId, imageData) {
+            const img = document.getElementById(imgId);
+            const placeholder = document.getElementById(placeholderId);
+            
+            if (imageData) {
+                img.src = "data:image/png;base64," + imageData;
+                img.style.display = "block";
+                placeholder.style.display = "none";
+                
+                // Store in localStorage for persistence
+                localStorage.setItem(imgId + '_last', img.src);
+            } else {
+                // Try to load from localStorage
+                const lastImage = localStorage.getItem(imgId + '_last');
+                if (lastImage) {
+                    img.src = lastImage;
+                    img.style.display = "block";
+                    placeholder.style.display = "none";
+                } else {
+                    img.style.display = "none";
+                    placeholder.style.display = "flex";
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-darkbg text-white min-h-screen">
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <h1 class="text-4xl font-bold text-center text-white mb-8">Real-Time Twitter Sentiment Analysis</h1>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Tweets Container -->
+            <div class="bg-darkcard rounded-xl shadow-lg p-6">
+                <h2 class="text-xl font-semibold text-white mb-4">Live Tweets</h2>
+                <div id="tweets" class="space-y-4 max-h-[700px] overflow-y-auto">
+                    <!-- Tweets will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Word Clouds Container - Compact layout -->
+            <div class="bg-darkcard rounded-xl shadow-lg p-6">
+                <!-- Live Trending Section -->
+                <div class="mb-6">
+                    <h2 class="text-xl font-semibold text-white mb-4">Live Trending Words</h2>
+                    <div class="relative aspect-[16/9] bg-darkcard/50 rounded-lg overflow-hidden">
+                        <img id="live-wordcloud" src="" class="w-full h-full object-contain">
+                        <div id="live-wordcloud-placeholder" class="absolute inset-0 flex items-center justify-center text-gray-400">
+                            Waiting for live data...
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Historical Trending Section -->
+                <div>
+                    <h2 class="text-xl font-semibold text-white mb-4">Historical Trending Words</h2>
+                    <div class="relative aspect-[16/9] bg-darkcard/50 rounded-lg overflow-hidden">
+                        <img id="historical-wordcloud" src="" class="w-full h-full object-contain">
+                        <div id="historical-wordcloud-placeholder" class="absolute inset-0 flex items-center justify-center text-gray-400">
+                            Loading historical data...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
