@@ -1,0 +1,23 @@
+{
+  "dependencies": {
+    "tailwindcss": "^4.0.3"
+  },
+  "name": "realtime-socialmedia-analysis",
+  "version": "1.0.0",
+  "description": "A real-time data pipeline for collecting and analyzing social media data using Apache Kafka and Python.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mdzub7/RealTime-SocialMedia-Analytics.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Mdzub7/RealTime-SocialMedia-Analytics/issues"
+  },
+  "homepage": "https://github.com/Mdzub7/RealTime-SocialMedia-Analytics#readme"
+}
