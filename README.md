@@ -2,6 +2,8 @@
 
 A real-time data pipeline for collecting and analyzing social media data using Apache Kafka and Python.
 
+![Real-Time Dashboard Demo](assets/demo.png)
+
 ## Project Overview
 
 This project implements a real-time data pipeline that:
@@ -22,34 +24,48 @@ This project implements a real-time data pipeline that:
 
 ## Project Structure
 RealTime-SocialMedia-Analysis/
+├── dashboard/
+│   ├── app.py              # Flask application
+│   ├── database.py         # Database models and operations
+│   └── templates/          # Frontend templates
+├── flink/
+│   └── flink_processor.py  # Flink sentiment analysis
 ├── kafka/
-│   ├── producer.py
-│   └── consumer.py
-├── docker-compose.yml
-├── requirements.txt
-└── .env
+│   └── producer.py         # Tweet producer
+├── docker-compose.yml      # Docker services configuration
+└── requirements.txt        # Python dependencies
 
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch ( git checkout -b feature/amazing-feature )
+3. Commit your changes ( git commit -m 'Add some amazing feature' )
+4. Push to the branch ( git push origin feature/amazing-feature )
+5. Open a Pull Request
 
 ## Setup Instructions
 
 1. Clone the repository
-```bash
+
 git clone <your-repository-url>
 cd RealTime-SocialMedia-Analysis
 
 2. Create and activate virtual environment
+
 python -m venv venv
 source venv/bin/activate  # For Unix/macOS
 
 3. Install dependencies
-```bash
+
 pip install -r requirements.txt
 
 4. Set up environment variables
+
 cp .env.example .env
 # Edit .env file with your Twitter API credentials
 
 5. Start Kafka and run the producer and consumer
+
 docker-compose up -d
 
 # Terminal 1  
@@ -65,7 +81,7 @@ python kafka/producer.py
 - Rate limit handling
 - Configurable tweet limit
 ## Future Enhancements
-- Sentiment analysis of tweets
+- Real-time social media sentiment analysis
 - Data visualization
 - Advanced filtering options
 - Database integration
@@ -80,12 +96,5 @@ Mohammed Zubair A
 - Twitter API Documentation
 - Apache Kafka Documentation
 - Python Tweepy Library
-```plaintext
 
-You can customize this README by:
-1. Adding your repository URL
-2. Choosing a license
-3. Adding your name
-4. Modifying the future enhancements section based on your plans
-5. Adding any additional sections you think are relevant
 
