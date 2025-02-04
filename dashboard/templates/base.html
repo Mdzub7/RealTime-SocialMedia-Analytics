@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Twitter Analysis Dashboard{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-black min-h-screen font-['Inter'] text-white">
+    <!-- Navigation -->
+    <nav class="bg-gray-900 shadow-lg fixed w-full z-50">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/" class="text-white font-bold text-xl">TwitterAnalytics</a>
+                </div>
+                <div class="flex space-x-4">
+                    <a href="/" class="text-gray-300 hover:text-white px-3 py-2 rounded-md transition">Home</a>
+                    <a href="/tweets" class="text-gray-300 hover:text-white px-3 py-2 rounded-md transition">Live Analysis</a>
+                    <a href="/trends" class="text-gray-300 hover:text-white px-3 py-2 rounded-md transition">Trends</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="pt-16 pb-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Scripts -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        dark: '#121212',
+                        'dark-card': '#1E1E1E',
+                        'dark-hover': '#2D2D2D'
+                    }
+                }
+            }
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

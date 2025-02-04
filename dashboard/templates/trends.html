@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Trend Analysis{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4">
+    <!-- Header -->
+    <div class="py-8">
+        <h1 class="text-4xl font-bold text-white mb-2">Trend Analysis</h1>
+        <p class="text-gray-400">Deep insights into Twitter conversations and sentiment patterns</p>
+    </div>
+
+    <!-- Analytics Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+        <!-- Trending Topics -->
+        <div class="lg:col-span-2 bg-gray-800 rounded-xl shadow-lg p-6 transform transition-all duration-300 hover:bg-gray-700">
+            <h2 class="text-xl font-semibold text-white mb-6">Trending Topics</h2>
+            <div class="flex flex-wrap gap-3">
+                {% for item in trending %}
+                <div class="group relative">
+                    <div class="px-4 py-2 bg-gray-900/50 rounded-full text-sm font-medium text-gray-200 hover:bg-gray-600 transition-all cursor-pointer">
+                        {{ item.tag }}
+                        <span class="ml-1 text-blue-400">({{ item.count }})</span>
+                    </div>
+                    <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-10 left-1/2 transform -translate-x-1/2 px-3 py-1 bg-gray-700 text-white text-xs rounded whitespace-nowrap">
+                        Mentioned {{ item.count }} times
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="bg-gray-800 rounded-xl shadow-lg p-6 transform transition-all duration-300 hover:bg-gray-700">
+            <h2 class="text-xl font-semibold text-white mb-6">Quick Stats</h2>
+            <div class="space-y-6">
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-400">Total Tweets</span>
+                    <span class="text-2xl font-semibold text-white" id="total-tweets">0</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-400">Avg. Sentiment</span>
+                    <span class="text-2xl font-semibold text-blue-400" id="avg-sentiment">-</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-400">Peak Activity</span>
+                    <span class="text-2xl font-semibold text-purple-400" id="peak-time">-</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Visualization Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <!-- Sentiment Timeline -->
+        <div class="bg-gray-800 rounded-xl shadow-lg p-6 transform transition-all duration-300 hover:bg-gray-700">
+            <h2 class="text-xl font-semibold text-white mb-6">Sentiment Timeline</h2>
+            <div class="aspect-[4/3] bg-gray-900/50 rounded-lg p-4">
+                <img src="/trends_chart" alt="Sentiment Timeline" class="w-full h-full object-contain">
+            </div>
+        </div>
+
+        <!-- Word Cloud -->
+        <div class="bg-gray-800 rounded-xl shadow-lg p-6 transform transition-all duration-300 hover:bg-gray-700">
+            <h2 class="text-xl font-semibold text-white mb-6">Topic Cloud</h2>
+            <div class="aspect-[4/3] bg-gray-900/50 rounded-lg p-4">
+                <img id="historical-wordcloud" src="" alt="Word Cloud" class="w-full h-full object-contain">
+            </div>
+        </div>
+    </div>
+
+    <!-- Sentiment Distribution -->
+    <div class="bg-gray-800 rounded-xl shadow-lg p-6 mb-8 transform transition-all duration-300 hover:bg-gray-700">
+        <h2 class="text-xl font-semibold text-white mb-6">Sentiment Distribution</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div class="text-center p-6 bg-gray-900/50 rounded-lg">
+                <div class="text-3xl font-bold text-green-400 mb-2" id="positive-percentage">0%</div>
+                <div class="text-sm text-gray-400">Positive Sentiment</div>
+            </div>
+            <div class="text-center p-6 bg-gray-900/50 rounded-lg">
+                <div class="text-3xl font-bold text-blue-400 mb-2" id="neutral-percentage">0%</div>
+                <div class="text-sm text-gray-400">Neutral Sentiment</div>
+            </div>
+            <div class="text-center p-6 bg-gray-900/50 rounded-lg">
+                <div class="text-3xl font-bold text-red-400 mb-2" id="negative-percentage">0%</div>
+                <div class="text-sm text-gray-400">Negative Sentiment</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+// Replace the existing scripts block with:
+{% block scripts %}
+<script>
+    const socket = io();
+    let totalTweets = 0;
+    const sentimentCounts = { Positive: 0, Negative: 0, Neutral: 0 };
+
+    // Load historical data on page load
+    fetch('/get_historical_stats')
+        .then(response => response.json())
+        .then(data => {
+            totalTweets = data.total_tweets;
+            Object.assign(sentimentCounts, data.sentiment_counts);
+            updateStats();
+            if (data.peak_time) {
+                document.getElementById('peak-time').textContent = 
+                    new Date(data.peak_time[0]).toLocaleTimeString();
+            }
+        });
+
+    socket.on('new_tweet', function(data) {
+        totalTweets++;
+        sentimentCounts[data.sentiment]++;
+        updateStats();
+    });
+
+    function updateStats() {
+        document.getElementById('total-tweets').textContent = totalTweets;
+
+        for (const sentiment of ['Positive', 'Negative', 'Neutral']) {
+            const percentage = ((sentimentCounts[sentiment] / totalTweets) * 100).toFixed(1);
+            document.getElementById(`${sentiment.toLowerCase()}-percentage`).textContent = `${percentage}%`;
+        }
+
+        const avgSentiment = calculateAverageSentiment();
+        document.getElementById('avg-sentiment').textContent = avgSentiment;
+    }
+
+    function calculateAverageSentiment() {
+        if (totalTweets === 0) return '-';
+        if (sentimentCounts.Positive > sentimentCounts.Negative) return '😊';
+        if (sentimentCounts.Negative > sentimentCounts.Positive) return '😔';
+        return '😐';
+    }
+
+    socket.on('wordcloud_update', function(data) {
+        if (data.historical_image) {
+            const img = document.getElementById('historical-wordcloud');
+            img.src = "data:image/png;base64," + data.historical_image;
+        }
+    });
+    // In the scripts section, add this line after socket initialization
+    socket.connect();  // Ensure connection is established
+
+    // Add this to periodically refresh the sentiment timeline
+    setInterval(() => {
+        document.querySelector('img[src="/trends_chart"]').src = 
+            '/trends_chart?' + new Date().getTime();
+    }, 30000);
+
+    socket.connect();
+</script>
+{% endblock %}

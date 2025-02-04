@@ -172,9 +172,91 @@ def get_tweets():
     finally:
         session.close()
 
+# Remove or comment out the old index route
+#@app.route("/")
+#def index():
+#    return render_template("index.html")
+
+# Keep these routes
 @app.route("/")
-def index():
-    return render_template("index.html")
+def home():
+    return render_template("home.html")
+
+@app.route("/tweets")
+def tweets():
+    return render_template("tweets.html")
+
+@app.route("/trends")
+def trends():
+    trending = [{"tag": f"#{word}", "count": count} 
+                for word, count in word_counter.most_common(10)]
+    return render_template("trends.html", trending=trending)
+
+# Add these new routes and functions
+
+@app.route("/get_historical_stats")
+def get_historical_stats():
+    session = SessionLocal()
+    try:
+        total_tweets = session.query(func.count(Tweet.id)).scalar()
+        sentiment_counts = session.query(
+            Tweet.sentiment, 
+            func.count(Tweet.id)
+        ).group_by(Tweet.sentiment).all()
+        
+        stats = {
+            "total_tweets": total_tweets,
+            "sentiment_counts": dict(sentiment_counts),
+            "peak_time": session.query(
+                func.date_trunc('hour', Tweet.created_at),
+                func.count(Tweet.id)
+            ).group_by(
+                func.date_trunc('hour', Tweet.created_at)
+            ).order_by(func.count(Tweet.id).desc()).first()
+        }
+        return jsonify(stats)
+    finally:
+        session.close()
+
+@app.route("/trends_chart")
+def trends_chart():
+    session = SessionLocal()
+    try:
+        # Get hourly sentiment counts
+        hourly_sentiments = session.query(
+            func.date_trunc('hour', Tweet.created_at),
+            Tweet.sentiment,
+            func.count(Tweet.id)
+        ).group_by(
+            func.date_trunc('hour', Tweet.created_at),
+            Tweet.sentiment
+        ).order_by(func.date_trunc('hour', Tweet.created_at)).all()
+        
+        # Generate timeline chart
+        plt.figure(figsize=(12, 6))
+        sentiments = ['Positive', 'Negative', 'Neutral']
+        colors = ['green', 'red', 'blue']
+        
+        for sentiment, color in zip(sentiments, colors):
+            data = [(time, count) for time, sent, count in hourly_sentiments if sent == sentiment]
+            if data:
+                times, counts = zip(*data)
+                plt.plot(times, counts, color=color, label=sentiment)
+        
+        plt.legend()
+        plt.title('Sentiment Timeline')
+        plt.xlabel('Time')
+        plt.ylabel('Tweet Count')
+        plt.xticks(rotation=45)
+        
+        img_io = io.BytesIO()
+        plt.savefig(img_io, format='png', bbox_inches='tight')
+        plt.close()
+        img_io.seek(0)
+        
+        return send_file(img_io, mimetype='image/png')
+    finally:
+        session.close()
 
 if __name__ == "__main__":
     # Start Kafka Consumer in Background Thread
