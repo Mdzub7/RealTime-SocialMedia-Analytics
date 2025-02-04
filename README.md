@@ -15,16 +15,6 @@ A real-time social media analytics dashboard that processes Twitter data using A
 - Historical data persistence
 - Trend analysis with timeline visualization
 
-## Screenshots
-
-### Live Analysis Dashboard
-![Live Analysis](img1.jpeg)
-
-### Trend Analysis
-![Trends](img2.jpeg)
-
-### Historical Data View
-![Historical Data](img3.jpeg)
 
 ## Technology Stack
 
