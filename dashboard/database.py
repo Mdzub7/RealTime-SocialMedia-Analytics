@@ -38,18 +38,18 @@ class Tweet(Base):
     sentiment = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
+def init_db():
+    Base.metadata.create_all(bind=engine)
+
 def save_tweet(text, sentiment):
-    session = SessionLocal()
+    db = SessionLocal()
     try:
         tweet = Tweet(text=text, sentiment=sentiment)
-        session.add(tweet)
-        session.commit()
-        logger.info(f"Tweet saved successfully: {text[:50]}...")
-    except Exception as e:
-        session.rollback()
-        logger.error(f"Error saving tweet: {str(e)}")
+        db.add(tweet)
+        db.commit()
+        return tweet
     finally:
-        session.close()
+        db.close()
 
 def init_db():
     try:

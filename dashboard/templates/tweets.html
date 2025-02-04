@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}Live Analysis - Twitter Dashboard{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4">
+    <!-- Header -->
+    <div class="py-8">
+        <h1 class="text-4xl font-bold text-white mb-2">Live Twitter Analysis</h1>
+        <p class="text-gray-400">Real-time sentiment analysis and trend visualization</p>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <!-- Live Tweets Feed -->
+        <div class="bg-gray-800 rounded-xl shadow-lg p-6 transform transition-all duration-300 hover:bg-gray-700">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold text-white">Live Tweets</h2>
+                <div class="animate-pulse flex items-center">
+                    <div class="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                    <span class="text-sm text-gray-400">Live</span>
+                </div>
+            </div>
+            <div id="tweets" class="space-y-4 h-[600px] overflow-y-auto pr-4">
+                <!-- Tweets will be inserted here -->
+            </div>
+        </div>
+
+        <!-- Analytics Section -->
+        <div class="space-y-8">
+            <!-- Word Cloud -->
+            <div class="bg-gray-800 rounded-xl shadow-lg p-6 transform transition-all duration-300 hover:bg-gray-700">
+                <h2 class="text-xl font-semibold text-white mb-4">Trending Words</h2>
+                <div class="relative aspect-video bg-gray-900/50 rounded-lg overflow-hidden">
+                    <img id="live-wordcloud" src="" class="w-full h-full object-contain">
+                    <div id="live-wordcloud-placeholder" class="absolute inset-0 flex items-center justify-center text-gray-400">
+                        Generating word cloud...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sentiment Distribution -->
+            <div class="bg-gray-800 rounded-xl shadow-lg p-6 transform transition-all duration-300 hover:bg-gray-700">
+                <h2 class="text-xl font-semibold text-white mb-4">Sentiment Distribution</h2>
+                <div class="space-y-4">
+                    <div class="sentiment-bar">
+                        <div class="flex justify-between mb-1">
+                            <span class="text-gray-400">Positive</span>
+                            <span class="text-gray-400" id="positive-count">0</span>
+                        </div>
+                        <div class="w-full bg-gray-900/50 rounded-full h-2">
+                            <div class="bg-green-400 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="sentiment-bar">
+                        <div class="flex justify-between mb-1">
+                            <span class="text-gray-400">Negative</span>
+                            <span class="text-gray-400" id="negative-count">0</span>
+                        </div>
+                        <div class="w-full bg-gray-900/50 rounded-full h-2">
+                            <div class="bg-red-400 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="sentiment-bar">
+                        <div class="flex justify-between mb-1">
+                            <span class="text-gray-400">Neutral</span>
+                            <span class="text-gray-400" id="neutral-count">0</span>
+                        </div>
+                        <div class="w-full bg-gray-900/50 rounded-full h-2">
+                            <div class="bg-blue-400 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const socket = io();
+    const processedTweets = new Set();
+    const sentimentCounts = { Positive: 0, Negative: 0, Neutral: 0 };
+    
+    socket.on('new_tweet', function(data) {
+        if (!processedTweets.has(data.text)) {
+            processedTweets.add(data.text);
+            const tweetsContainer = document.getElementById('tweets');
+            const tweetElement = createTweetElement(data);
+            tweetsContainer.insertBefore(tweetElement, tweetsContainer.firstChild);
+            
+            if (tweetsContainer.children.length > 50) {
+                tweetsContainer.removeChild(tweetsContainer.lastChild);
+            }
+
+            sentimentCounts[data.sentiment]++;
+            updateSentimentBars();
+        }
+    });
+
+    function createTweetElement(data) {
+        const div = document.createElement('div');
+        div.className = 'bg-gray-900/50 rounded-lg p-4 transform transition duration-300 hover:scale-[1.02]';
+        
+        const sentimentColor = {
+            'Positive': 'text-green-400',
+            'Negative': 'text-red-400',
+            'Neutral': 'text-blue-400'
+        };
+        
+        div.innerHTML = `
+            <div class="flex items-center gap-2 mb-2">
+                <span class="px-2 py-1 rounded-full bg-gray-800 text-sm ${sentimentColor[data.sentiment]}">
+                    ${data.sentiment}
+                </span>
+            </div>
+            <p class="text-gray-300">${data.text}</p>
+        `;
+        return div;
+    }
+
+    function updateSentimentBars() {
+        const total = Object.values(sentimentCounts).reduce((a, b) => a + b, 0);
+        
+        for (const sentiment of ['Positive', 'Negative', 'Neutral']) {
+            const count = sentimentCounts[sentiment];
+            const percentage = (count / total * 100) || 0;
+            const bar = document.querySelector(`.sentiment-bar:nth-child(${
+                sentiment === 'Positive' ? '1' : sentiment === 'Negative' ? '2' : '3'
+            }) .bg-${sentiment === 'Positive' ? 'green' : sentiment === 'Negative' ? 'red' : 'blue'}-400`);
+            const countElement = document.getElementById(`${sentiment.toLowerCase()}-count`);
+            
+            bar.style.width = `${percentage}%`;
+            countElement.textContent = count;
+        }
+    }
+
+    socket.on('wordcloud_update', function(data) {
+        if (data.live_image) {
+            const img = document.getElementById('live-wordcloud');
+            const placeholder = document.getElementById('live-wordcloud-placeholder');
+            img.src = "data:image/png;base64," + data.live_image;
+            img.style.display = "block";
+            placeholder.style.display = "none";
+        }
+    });
+
+    // Load initial tweets
+    fetch("/get_tweets")
+        .then(response => response.json())
+        .then(tweets => {
+            const tweetsContainer = document.getElementById('tweets');
+            tweets.forEach(data => {
+                tweetsContainer.appendChild(createTweetElement(data));
+                sentimentCounts[data.sentiment]++;
+            });
+            updateSentimentBars();
+        });
+    // In the scripts section, add this line after socket initialization
+    socket.connect();  // Ensure connection is established
+    // Add this to the scripts block:
+    // Load initial word cloud
+    fetch('/get_historical_wordcloud')
+        .then(response => response.json())
+        .then(data => {
+            if (data.image) {
+                const img = document.getElementById('live-wordcloud');
+                const placeholder = document.getElementById('live-wordcloud-placeholder');
+                img.src = "data:image/png;base64," + data.image;
+                img.style.display = "block";
+                placeholder.style.display = "none";
+            }
+        });
+</script>
+{% endblock %}

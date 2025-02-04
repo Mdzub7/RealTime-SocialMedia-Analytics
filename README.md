@@ -1,54 +1,37 @@
 # Real-Time Social Media Analysis
 
-A real-time data pipeline for collecting and analyzing social media data using Apache Kafka and Python.
+A real-time social media analytics dashboard that processes Twitter data using Apache Flink, Kafka, and PostgreSQL, featuring sentiment analysis and trend visualization.
 
-![Real-Time Dashboard Demo](assets/demo.png)
+![Real-Time Dashboard Demo](assets/img1.jpeg)
+![Real-Time Dashboard Demo](assets/img2.jpeg)
+![Real-Time Dashboard Demo](assets/img3.jpeg)
 
-## Project Overview
+## Features
 
-This project implements a real-time data pipeline that:
-- Collects tweets about AI, Machine Learning, and Data Science
-- Processes them through Apache Kafka
-- Stores them for further analysis
+- Real-time tweet processing and sentiment analysis
+- Interactive dashboard with dark theme
+- Live word cloud visualization
+- Sentiment distribution tracking
+- Historical data persistence
+- Trend analysis with timeline visualization
+
 
 ## Technology Stack
 
-- Python 3.9+
-- Apache Kafka
-- Docker & Docker Compose
-- Twitter API v2
-- Additional Python libraries:
-  - tweepy
-  - kafka-python
-  - python-dotenv
+- **Backend**: Python, Flask, SQLAlchemy
+- **Frontend**: TailwindCSS, Socket.IO
+- **Data Processing**: Apache Flink
+- **Message Queue**: Apache Kafka
+- **Database**: PostgreSQL
+- **Containerization**: Docker
 
-## Project Structure
-RealTime-SocialMedia-Analysis/
-├── dashboard/
-│   ├── app.py              # Flask application
-│   ├── database.py         # Database models and operations
-│   └── templates/          # Frontend templates
-├── flink/
-│   └── flink_processor.py  # Flink sentiment analysis
-├── kafka/
-│   └── producer.py         # Tweet producer
-├── docker-compose.yml      # Docker services configuration
-└── requirements.txt        # Python dependencies
+## Setup and Installation
 
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch ( git checkout -b feature/amazing-feature )
-3. Commit your changes ( git commit -m 'Add some amazing feature' )
-4. Push to the branch ( git push origin feature/amazing-feature )
-5. Open a Pull Request
-
-## Setup Instructions
-
-1. Clone the repository
-
-git clone <your-repository-url>
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/RealTime-SocialMedia-Analysis.git
 cd RealTime-SocialMedia-Analysis
+```
 
 2. Create and activate virtual environment
 
