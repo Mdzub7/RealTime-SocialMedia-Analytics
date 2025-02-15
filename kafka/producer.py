@@ -82,6 +82,22 @@ def fetch_and_send_tweets(producer):
                         "created_at": str(tweet.created_at)
                     }
                     print(f"Tweet {tweet_count + 1}/{MAX_TWEETS}: {message['text'][:100]}...")
+                    # Add detailed logging
+                    def send_tweets_to_kafka(tweets):
+                        try:
+                            producer = KafkaProducer(
+                                bootstrap_servers=['localhost:9092'],
+                                value_serializer=lambda v: json.dumps(v).encode('utf-8')
+                            )
+                            
+                            for tweet in tweets:
+                                print(f"Sending tweet to Kafka: {tweet['text'][:50]}...")
+                                producer.send('social_media_data', tweet)
+                                producer.flush()
+                            
+                            print(f"Successfully sent {len(tweets)} tweets to Kafka")
+                        except Exception as e:
+                            print(f"Error sending to Kafka: {str(e)}")
                     producer.send(KAFKA_TOPIC, message)
                     tweet_count += 1
                     time.sleep(3)

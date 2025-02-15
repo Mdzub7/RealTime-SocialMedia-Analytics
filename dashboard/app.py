@@ -1,269 +1,313 @@
 import matplotlib
-matplotlib.use('Agg')  # Add this line at the very top before other imports
+matplotlib.use('Agg')
 
+# Core imports
 from flask import Flask, render_template, jsonify
 from flask_socketio import SocketIO
+from flask_cors import CORS
 from kafka import KafkaConsumer
+from datetime import datetime, timedelta
+from sqlalchemy import func, desc, and_, text
 import json
 import threading
-from collections import Counter
+import time
+import logging
 import re
+from collections import Counter
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 import io
 import base64
 from database import save_tweet, SessionLocal, Tweet, init_db
 
-from database import init_db, Tweet, SessionLocal
-import logging
+# Constants
+KAFKA_TOPIC = 'social_media_data'
+KAFKA_BROKER = 'localhost:9092'
+word_counter = Counter()
+
+# Flask and SocketIO setup
+app = Flask(__name__)
+CORS(app)
+app.config['SECRET_KEY'] = 'secret!'
+# Update SocketIO initialization
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    logger=True,
+    engineio_logger=True,
+    ping_timeout=60,
+    ping_interval=25,
+    async_mode='threading',
+    transport=['polling', 'websocket']
+)
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Initialize database tables
+# Initialize database
 logger.info("Initializing database...")
 init_db()
 
-# Flask Setup
-app = Flask(__name__)
-app.config['SECRET_KEY'] = 'secret!'  # Add secret key
-socketio = SocketIO(app, 
-    cors_allowed_origins="*",
-    logger=True,
-    engineio_logger=True
-)
-
-# Kafka Configuration
-KAFKA_TOPIC = "processed_tweets"
-KAFKA_BROKER = "localhost:9092"
-
-# Word Frequency Counter
-word_counter = Counter()
-
+# Helper functions
 def clean_text(text):
-    text = re.sub(r"http\S+", "", text)
-    text = re.sub(r"[^a-zA-Z\s]", "", text)
-    text = text.lower().strip()
-    return text
+    return ' '.join(re.sub(r'[^a-zA-Z\s]', '', text.lower()).split())
 
-# Add after existing imports
-from sqlalchemy import Column, Integer, String, func
-from collections import defaultdict
-
-# Add new model in database.py first, then update app.py
 def get_historical_word_counter():
+    counter = Counter()
     session = SessionLocal()
     try:
-        tweets = session.query(Tweet).all()
-        counter = Counter()
+        tweets = session.query(Tweet.text).all()
         for tweet in tweets:
-            words = [w for w in clean_text(tweet.text).split() if len(w) > 3]
+            words = [w for w in clean_text(tweet[0]).split() if len(w) > 3]
             counter.update(words)
         return counter
     finally:
         session.close()
 
-# Update generate_wordcloud function
-def generate_wordcloud(counter, width=800, height=400):
-    try:
-        plt.clf()
-        if not counter:
-            logger.warning("No words in counter for wordcloud")
-            return None
-            
-        wordcloud = WordCloud(
-            width=width, 
-            height=height, 
-            background_color='white',
-            min_font_size=10
-        ).generate_from_frequencies(counter)
-        
-        plt.figure(figsize=(10, 6))
-        plt.imshow(wordcloud, interpolation='bilinear')
-        plt.axis('off')
-        
-        img_io = io.BytesIO()
-        plt.savefig(img_io, format='png', bbox_inches='tight', pad_inches=0)
-        plt.close('all')
-        img_io.seek(0)
-        
-        return base64.b64encode(img_io.getvalue()).decode('utf-8')
-    except Exception as e:
-        logger.error(f"Error generating wordcloud: {str(e)}")
+def generate_wordcloud(word_counter):
+    if not word_counter:
         return None
+    
+    wordcloud = WordCloud(width=800, height=400, background_color='white').generate_from_frequencies(word_counter)
+    
+    plt.figure(figsize=(10, 5))
+    plt.imshow(wordcloud, interpolation='bilinear')
+    plt.axis('off')
+    
+    img = io.BytesIO()
+    plt.savefig(img, format='png', bbox_inches='tight')
+    img.seek(0)
+    
+    return base64.b64encode(img.getvalue()).decode()
 
-# Add new route for historical wordcloud
-@app.route("/get_historical_wordcloud")
-def get_historical_wordcloud():
+# API Routes
+@app.route("/")
+def test_route():
+    return jsonify({"status": "Flask server is running"})
+
+@app.route("/api/tweets/live")
+def get_live_tweets():
     try:
-        historical_counter = get_historical_word_counter()
-        wordcloud_image = generate_wordcloud(historical_counter)
-        return jsonify({"image": wordcloud_image})
-    except Exception as e:
-        logger.error(f"Error generating historical wordcloud: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-# Update consume_kafka function
-def consume_kafka():
-    try:
-        consumer = KafkaConsumer(
-            KAFKA_TOPIC,
-            bootstrap_servers=KAFKA_BROKER,
-            auto_offset_reset='earliest',
-            value_deserializer=lambda v: json.loads(v.decode('utf-8'))
-        )
-        
-        for message in consumer:
-            tweet = message.value
-            text = clean_text(tweet["text"])
-            sentiment = tweet["sentiment"]
+        session = SessionLocal()
+        tweets = session.query(Tweet).order_by(Tweet.created_at.desc()).limit(50).all()
+        if not tweets:
+            return jsonify([])
             
-            # Store in Database
-            save_tweet(text, sentiment)
-            
-            # Update live word counter
-            words = [w for w in text.split() if len(w) > 3]
-            word_counter.update(words)
-            
-            # Generate and emit updates
-            socketio.emit('new_tweet', {"text": text, "sentiment": sentiment})
-            
-            # Generate and emit both word clouds
-            live_wordcloud = generate_wordcloud(word_counter)
-            historical_wordcloud = generate_wordcloud(get_historical_word_counter())
-            
-            if live_wordcloud and historical_wordcloud:
-                socketio.emit('wordcloud_update', {
-                    "live_image": live_wordcloud,
-                    "historical_image": historical_wordcloud
-                })
-            
-            logger.info(f"Processed tweet: {text[:50]}...")
-    except Exception as e:
-        logger.error(f"Kafka consumer error: {str(e)}")
-
-# Add new route to fetch stored tweets
-from database import SessionLocal, Tweet, init_db
-
-# Initialize database when app starts
-init_db()
-
-@app.route("/get_tweets")
-def get_tweets():
-    session = SessionLocal()
-    try:
-        # Test database connection
-        test_query = session.query(Tweet).first()
-        logger.info(f"Database connection test: {'Success' if test_query is not None else 'No data found'}")
-        
-        tweets = session.query(Tweet).order_by(Tweet.created_at.desc()).limit(20).all()
-        logger.info(f"Retrieved {len(tweets)} tweets from database")
-        
-        tweet_data = [{
+        return jsonify([{
+            "id": str(tweet.id),
             "text": tweet.text,
             "sentiment": tweet.sentiment,
             "created_at": tweet.created_at.isoformat()
-        } for tweet in tweets]
-        return jsonify(tweet_data)
+        } for tweet in tweets])
     except Exception as e:
-        logger.error(f"Database error: {str(e)}")
-        return jsonify([])
+        logger.error(f"Error fetching tweets: {str(e)}")
+        return jsonify({"error": "Database error"}), 500
     finally:
         session.close()
 
-# Remove or comment out the old index route
-#@app.route("/")
-#def index():
-#    return render_template("index.html")
-
-# Keep these routes
-@app.route("/")
-def home():
-    return render_template("home.html")
-
-@app.route("/tweets")
-def tweets():
-    return render_template("tweets.html")
-
-@app.route("/trends")
-def trends():
-    trending = [{"tag": f"#{word}", "count": count} 
-                for word, count in word_counter.most_common(10)]
-    return render_template("trends.html", trending=trending)
-
-# Add these new routes and functions
-
-@app.route("/get_historical_stats")
-def get_historical_stats():
+@app.route("/api/analytics/summary")
+def get_analytics_summary():
     session = SessionLocal()
     try:
         total_tweets = session.query(func.count(Tweet.id)).scalar()
-        sentiment_counts = session.query(
-            Tweet.sentiment, 
-            func.count(Tweet.id)
-        ).group_by(Tweet.sentiment).all()
+        sentiment_distribution = dict(
+            session.query(Tweet.sentiment, func.count(Tweet.id))
+            .group_by(Tweet.sentiment)
+            .all()
+        )
         
-        stats = {
+        historical_counter = get_historical_word_counter()
+        trending_words = [
+            {"word": word, "count": count} 
+            for word, count in historical_counter.most_common(10)
+        ]
+        
+        hourly_data = session.query(
+            func.date_trunc('hour', Tweet.created_at).label('hour'),
+            Tweet.sentiment,
+            func.count(Tweet.id).label('count')
+        ).group_by(
+            'hour',
+            Tweet.sentiment
+        ).order_by('hour').all()
+
+        return jsonify({
             "total_tweets": total_tweets,
-            "sentiment_counts": dict(sentiment_counts),
-            "peak_time": session.query(
-                func.date_trunc('hour', Tweet.created_at),
-                func.count(Tweet.id)
-            ).group_by(
-                func.date_trunc('hour', Tweet.created_at)
-            ).order_by(func.count(Tweet.id).desc()).first()
-        }
-        return jsonify(stats)
+            "sentiment_distribution": sentiment_distribution,
+            "trending_words": trending_words,
+            "hourly_data": [
+                {
+                    "hour": hour.isoformat(),
+                    "sentiment": sentiment,
+                    "count": count
+                }
+                for hour, sentiment, count in hourly_data
+            ]
+        })
     finally:
         session.close()
 
-@app.route("/trends_chart")
-def trends_chart():
+@app.route("/api/trends/hourly")
+def get_hourly_trends():
     session = SessionLocal()
     try:
-        # Get hourly sentiment counts
-        hourly_sentiments = session.query(
-            func.date_trunc('hour', Tweet.created_at),
+        last_24_hours = datetime.utcnow() - timedelta(hours=24)
+        hourly_data = session.query(
+            func.date_trunc('hour', Tweet.created_at).label('hour'),
             Tweet.sentiment,
-            func.count(Tweet.id)
+            func.count(Tweet.id).label('count')
+        ).filter(
+            Tweet.created_at >= last_24_hours
         ).group_by(
-            func.date_trunc('hour', Tweet.created_at),
+            'hour',
             Tweet.sentiment
-        ).order_by(func.date_trunc('hour', Tweet.created_at)).all()
-        
-        # Generate timeline chart
-        plt.figure(figsize=(12, 6))
-        sentiments = ['Positive', 'Negative', 'Neutral']
-        colors = ['green', 'red', 'blue']
-        
-        for sentiment, color in zip(sentiments, colors):
-            data = [(time, count) for time, sent, count in hourly_sentiments if sent == sentiment]
-            if data:
-                times, counts = zip(*data)
-                plt.plot(times, counts, color=color, label=sentiment)
-        
-        plt.legend()
-        plt.title('Sentiment Timeline')
-        plt.xlabel('Time')
-        plt.ylabel('Tweet Count')
-        plt.xticks(rotation=45)
-        
-        img_io = io.BytesIO()
-        plt.savefig(img_io, format='png', bbox_inches='tight')
-        plt.close()
-        img_io.seek(0)
-        
-        return send_file(img_io, mimetype='image/png')
+        ).order_by('hour').all()
+
+        return jsonify([{
+            "hour": hour.isoformat(),
+            "sentiment": sentiment,
+            "count": count
+        } for hour, sentiment, count in hourly_data])
     finally:
         session.close()
 
+@app.route("/api/trends/realtime")
+def get_realtime_trends():
+    session = SessionLocal()
+    try:
+        last_hour = datetime.utcnow() - timedelta(hours=1)
+        recent_tweets = session.query(Tweet).filter(
+            Tweet.created_at >= last_hour
+        ).all()
+
+        counter = Counter()
+        for tweet in recent_tweets:
+            words = [w for w in clean_text(tweet.text).split() if len(w) > 3]
+            counter.update(words)
+
+        return jsonify({
+            "trending_words": [
+                {"word": word, "count": count}
+                for word, count in counter.most_common(10)
+            ],
+            "total_recent": len(recent_tweets)
+        })
+    finally:
+        session.close()
+
+# Error handlers
+@app.errorhandler(404)
+def not_found(e):
+    return jsonify({"error": "Route not found"}), 404
+
+@app.errorhandler(500)
+def server_error(e):
+    return jsonify({"error": "Internal server error"}), 500
+
+# WebSocket handlers
+@socketio.on('connect')
+def handle_connect():
+    logger.info("Client connected")
+    emit_initial_data()
+
+def emit_initial_data():
+    try:
+        session = SessionLocal()
+        sentiment_counts = dict(
+            session.query(Tweet.sentiment, func.count(Tweet.id))
+            .group_by(Tweet.sentiment)
+            .all()
+        )
+        historical_counter = get_historical_word_counter()
+        
+        socketio.emit('initial_data', {
+            'sentiment_counts': sentiment_counts,
+            'trending_words': [
+                {"word": word, "count": count} 
+                for word, count in historical_counter.most_common(10)
+            ]
+        })
+    finally:
+        session.close()
+
+def emit_analytics_update():
+    session = SessionLocal()
+    try:
+        total_tweets = session.query(func.count(Tweet.id)).scalar()
+        sentiment_counts = dict(
+            session.query(Tweet.sentiment, func.count(Tweet.id))
+            .group_by(Tweet.sentiment)
+            .all()
+        )
+        historical_counter = get_historical_word_counter()
+        
+        last_hour = datetime.utcnow() - timedelta(hours=1)
+        recent_count = session.query(func.count(Tweet.id)).filter(
+            Tweet.created_at >= last_hour
+        ).scalar()
+
+        socketio.emit('analytics_update', {
+            'total_tweets': total_tweets,
+            'sentiment_counts': sentiment_counts,
+            'trending': [
+                {"tag": word, "count": count} 
+                for word, count in historical_counter.most_common(10)
+            ],
+            'recent_count': recent_count
+        })
+    finally:
+        session.close()
+
+# Add near the top with other imports
+from flask_socketio import emit
+
+# Update the consume_kafka function
+def consume_kafka():
+    while True:
+        try:
+            print("Attempting to connect to Kafka...")
+            consumer = KafkaConsumer(
+                KAFKA_TOPIC,
+                bootstrap_servers=KAFKA_BROKER,
+                auto_offset_reset='earliest',
+                value_deserializer=lambda v: json.loads(v.decode('utf-8'))
+            )
+            print("✅ Successfully connected to Kafka")
+            
+            for message in consumer:
+                try:
+                    tweet = message.value
+                    print(f"📨 Received tweet: {tweet['text'][:50]}...")
+                    
+                    saved_tweet = save_tweet(tweet["text"], tweet["sentiment"])
+                    
+                    # Emit to all connected clients
+                    socketio.emit('new_tweet', {
+                        "id": str(saved_tweet.id),
+                        "text": tweet["text"],
+                        "sentiment": tweet["sentiment"],
+                        "created_at": saved_tweet.created_at.isoformat()
+                    }, broadcast=True)
+                    
+                    print("✅ Tweet emitted to clients")
+                    
+                except Exception as e:
+                    print(f"❌ Error processing message: {str(e)}")
+                    continue
+                    
+        except Exception as e:
+            print(f"❌ Kafka consumer error: {str(e)}")
+            time.sleep(5)
+
 if __name__ == "__main__":
-    # Start Kafka Consumer in Background Thread
+    init_db()
     threading.Thread(target=consume_kafka, daemon=True).start()
-    socketio.run(app, 
-        debug=True, 
-        port=8080,  # Changed port from 5000 to 8080
+    socketio.run(
+        app,
+        debug=True,
+        port=8080,
         host='0.0.0.0',
-        allow_unsafe_werkzeug=True
+        allow_unsafe_werkzeug=True,
+        use_reloader=False  # Disable reloader to prevent duplicate Kafka consumers
     )

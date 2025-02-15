@@ -77,99 +77,120 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-    const socket = io();
-    const processedTweets = new Set();
-    const sentimentCounts = { Positive: 0, Negative: 0, Neutral: 0 };
-    
-    socket.on('new_tweet', function(data) {
-        if (!processedTweets.has(data.text)) {
-            processedTweets.add(data.text);
-            const tweetsContainer = document.getElementById('tweets');
-            const tweetElement = createTweetElement(data);
-            tweetsContainer.insertBefore(tweetElement, tweetsContainer.firstChild);
-            
-            if (tweetsContainer.children.length > 50) {
-                tweetsContainer.removeChild(tweetsContainer.lastChild);
-            }
+<script type="text/javascript">
+    document.addEventListener('DOMContentLoaded', function() {
+        // Enhanced socket configuration
+        const socket = io({
+            transports: ['websocket'],
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000
+        });
+        const tweetsContainer = document.getElementById('tweets');
+        const sentimentCounts = { 'Positive': 0, 'Negative': 0, 'Neutral': 0 };
+        const maxTweets = 100; // Limit number of displayed tweets
 
+        // Enhanced connection handling
+        socket.on('connect', function() {
+            console.log('Socket connected successfully');
+            socket.emit('request_initial_data');
+            loadInitialData();
+        });
+
+        socket.on('disconnect', function() {
+            console.log('Socket disconnected, attempting reconnection...');
+        });
+
+        // Enhanced tweet handling
+        socket.on('new_tweet', function(data) {
+            console.log('New tweet received:', data);
+            addTweet(data);
+            updateMetrics(data);
+        });
+
+        function addTweet(data) {
+            const tweetDiv = document.createElement('div');
+            tweetDiv.className = 'bg-gray-800 p-4 rounded-lg mb-4 transform transition-all duration-300 hover:bg-gray-700';
+            tweetDiv.innerHTML = `
+                <p class="text-white">${data.text}</p>
+                <div class="flex justify-between mt-2">
+                    <span class="text-${data.sentiment === 'Positive' ? 'green' : 
+                                     data.sentiment === 'Negative' ? 'red' : 'blue'}-400">
+                        ${data.sentiment}
+                    </span>
+                    <span class="text-gray-400">${new Date(data.created_at).toLocaleString()}</span>
+                </div>
+            `;
+            
+            tweetsContainer.insertBefore(tweetDiv, tweetsContainer.firstChild);
+            
+            // Remove oldest tweet if exceeding max
+            const tweets = tweetsContainer.children;
+            if (tweets.length > maxTweets) {
+                tweets[tweets.length - 1].remove();
+            }
+        }
+
+        function updateMetrics(data) {
+            // Update sentiment counts
             sentimentCounts[data.sentiment]++;
             updateSentimentBars();
-        }
-    });
-
-    function createTweetElement(data) {
-        const div = document.createElement('div');
-        div.className = 'bg-gray-900/50 rounded-lg p-4 transform transition duration-300 hover:scale-[1.02]';
-        
-        const sentimentColor = {
-            'Positive': 'text-green-400',
-            'Negative': 'text-red-400',
-            'Neutral': 'text-blue-400'
-        };
-        
-        div.innerHTML = `
-            <div class="flex items-center gap-2 mb-2">
-                <span class="px-2 py-1 rounded-full bg-gray-800 text-sm ${sentimentColor[data.sentiment]}">
-                    ${data.sentiment}
-                </span>
-            </div>
-            <p class="text-gray-300">${data.text}</p>
-        `;
-        return div;
-    }
-
-    function updateSentimentBars() {
-        const total = Object.values(sentimentCounts).reduce((a, b) => a + b, 0);
-        
-        for (const sentiment of ['Positive', 'Negative', 'Neutral']) {
-            const count = sentimentCounts[sentiment];
-            const percentage = (count / total * 100) || 0;
-            const bar = document.querySelector(`.sentiment-bar:nth-child(${
-                sentiment === 'Positive' ? '1' : sentiment === 'Negative' ? '2' : '3'
-            }) .bg-${sentiment === 'Positive' ? 'green' : sentiment === 'Negative' ? 'red' : 'blue'}-400`);
-            const countElement = document.getElementById(`${sentiment.toLowerCase()}-count`);
             
-            bar.style.width = `${percentage}%`;
-            countElement.textContent = count;
+            // Update word cloud if available
+            if (data.wordcloud) {
+                updateWordCloud(data.wordcloud);
+            }
         }
-    }
 
-    socket.on('wordcloud_update', function(data) {
-        if (data.live_image) {
-            const img = document.getElementById('live-wordcloud');
-            const placeholder = document.getElementById('live-wordcloud-placeholder');
-            img.src = "data:image/png;base64," + data.live_image;
-            img.style.display = "block";
-            placeholder.style.display = "none";
+        // Enhanced initial data loading
+        async function loadInitialData() {
+            try {
+                const response = await fetch('/get_tweets');
+                const tweets = await response.json();
+                
+                if (tweets.length > 0) {
+                    tweets.forEach(tweet => {
+                        addTweet(tweet);
+                        sentimentCounts[tweet.sentiment]++;
+                    });
+                    updateSentimentBars();
+                }
+            } catch (error) {
+                console.error('Error loading initial tweets:', error);
+            }
         }
-    });
 
-    // Load initial tweets
-    fetch("/get_tweets")
-        .then(response => response.json())
-        .then(tweets => {
-            const tweetsContainer = document.getElementById('tweets');
-            tweets.forEach(data => {
-                tweetsContainer.appendChild(createTweetElement(data));
-                sentimentCounts[data.sentiment]++;
-            });
+        // Handle sentiment updates
+        socket.on('sentiment_update', function(data) {
+            console.log('Sentiment update:', data);
+            Object.assign(sentimentCounts, data);
             updateSentimentBars();
         });
-    // In the scripts section, add this line after socket initialization
-    socket.connect();  // Ensure connection is established
-    // Add this to the scripts block:
-    // Load initial word cloud
-    fetch('/get_historical_wordcloud')
-        .then(response => response.json())
-        .then(data => {
+
+        // Handle wordcloud updates
+        socket.on('wordcloud_update', function(data) {
+            console.log('Wordcloud update received');
+            const wordcloudImg = document.getElementById('live-wordcloud');
             if (data.image) {
-                const img = document.getElementById('live-wordcloud');
-                const placeholder = document.getElementById('live-wordcloud-placeholder');
-                img.src = "data:image/png;base64," + data.image;
-                img.style.display = "block";
-                placeholder.style.display = "none";
+                wordcloudImg.src = `data:image/png;base64,${data.image}`;
+                wordcloudImg.style.display = 'block';
             }
         });
+
+        function updateSentimentBars() {
+            const total = Object.values(sentimentCounts).reduce((a, b) => a + b, 0);
+            
+            for (const [sentiment, count] of Object.entries(sentimentCounts)) {
+                const countElement = document.getElementById(`${sentiment.toLowerCase()}-count`);
+                const barElement = document.querySelector(`.${sentiment.toLowerCase()}-bar`);
+                
+                if (countElement && barElement) {
+                    countElement.textContent = count;
+                    const percentage = total > 0 ? (count / total * 100) : 0;
+                    barElement.style.width = `${percentage}%`;
+                }
+            }
+        }
+    });
 </script>
 {% endblock %}

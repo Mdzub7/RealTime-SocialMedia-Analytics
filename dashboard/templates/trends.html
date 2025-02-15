@@ -10,145 +10,331 @@
     </div>
 
     <!-- Analytics Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <!-- Sentiment Timeline -->
+        <div class="bg-gray-800 rounded-xl shadow-lg p-6">
+            <h2 class="text-xl font-semibold text-white mb-4">Sentiment Timeline</h2>
+            <div id="sentiment-timeline" class="w-full h-[400px] bg-gray-900/50 rounded-lg"></div>
+        </div>
+
+        <!-- Word Cloud -->
+        <div class="bg-gray-800 rounded-xl shadow-lg p-6">
+            <h2 class="text-xl font-semibold text-white mb-4">Topic Cloud</h2>
+            <div class="relative aspect-video bg-gray-900/50 rounded-lg overflow-hidden">
+                <img id="topic-cloud" src="" class="w-full h-full object-contain">
+                <div id="topic-cloud-placeholder" class="absolute inset-0 flex items-center justify-center text-gray-400">
+                    Generating topic cloud...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trending Topics and Stats -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
         <!-- Trending Topics -->
-        <div class="lg:col-span-2 bg-gray-800 rounded-xl shadow-lg p-6 transform transition-all duration-300 hover:bg-gray-700">
-            <h2 class="text-xl font-semibold text-white mb-6">Trending Topics</h2>
-            <div class="flex flex-wrap gap-3">
+        <div class="lg:col-span-2 bg-gray-800 rounded-xl shadow-lg p-6">
+            <h2 class="text-xl font-semibold text-white mb-4">Trending Topics</h2>
+            <div class="flex flex-wrap gap-3" id="trending-topics">
                 {% for item in trending %}
-                <div class="group relative">
-                    <div class="px-4 py-2 bg-gray-900/50 rounded-full text-sm font-medium text-gray-200 hover:bg-gray-600 transition-all cursor-pointer">
-                        {{ item.tag }}
-                        <span class="ml-1 text-blue-400">({{ item.count }})</span>
-                    </div>
-                    <div class="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-10 left-1/2 transform -translate-x-1/2 px-3 py-1 bg-gray-700 text-white text-xs rounded whitespace-nowrap">
-                        Mentioned {{ item.count }} times
-                    </div>
+                <div class="px-4 py-2 bg-gray-900/50 rounded-full text-sm text-gray-200">
+                    {{ item.tag }}
+                    <span class="ml-1 text-blue-400">({{ item.count }})</span>
                 </div>
                 {% endfor %}
             </div>
         </div>
 
-        <!-- Quick Stats -->
-        <div class="bg-gray-800 rounded-xl shadow-lg p-6 transform transition-all duration-300 hover:bg-gray-700">
-            <h2 class="text-xl font-semibold text-white mb-6">Quick Stats</h2>
-            <div class="space-y-6">
-                <div class="flex items-center justify-between">
-                    <span class="text-gray-400">Total Tweets</span>
-                    <span class="text-2xl font-semibold text-white" id="total-tweets">0</span>
+        <!-- Sentiment Distribution -->
+        <div class="bg-gray-800 rounded-xl shadow-lg p-6">
+            <h2 class="text-xl font-semibold text-white mb-4">Sentiment Distribution</h2>
+            <div class="space-y-4">
+                <div class="sentiment-stat">
+                    <div class="flex justify-between mb-1">
+                        <span class="text-gray-400">Positive</span>
+                        <span class="text-green-400" id="positive-count">0</span>
+                    </div>
+                    <div class="w-full bg-gray-900/50 rounded-full h-2">
+                        <div id="positive-bar" class="bg-green-400 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
                 </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-gray-400">Avg. Sentiment</span>
-                    <span class="text-2xl font-semibold text-blue-400" id="avg-sentiment">-</span>
+                <div class="sentiment-stat">
+                    <div class="flex justify-between mb-1">
+                        <span class="text-gray-400">Negative</span>
+                        <span class="text-red-400" id="negative-count">0</span>
+                    </div>
+                    <div class="w-full bg-gray-900/50 rounded-full h-2">
+                        <div id="negative-bar" class="bg-red-400 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
                 </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-gray-400">Peak Activity</span>
-                    <span class="text-2xl font-semibold text-purple-400" id="peak-time">-</span>
+                <div class="sentiment-stat">
+                    <div class="flex justify-between mb-1">
+                        <span class="text-gray-400">Neutral</span>
+                        <span class="text-blue-400" id="neutral-count">0</span>
+                    </div>
+                    <div class="w-full bg-gray-900/50 rounded-full h-2">
+                        <div id="neutral-bar" class="bg-blue-400 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Visualization Section -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <!-- Sentiment Timeline -->
-        <div class="bg-gray-800 rounded-xl shadow-lg p-6 transform transition-all duration-300 hover:bg-gray-700">
-            <h2 class="text-xl font-semibold text-white mb-6">Sentiment Timeline</h2>
-            <div class="aspect-[4/3] bg-gray-900/50 rounded-lg p-4">
-                <img src="/trends_chart" alt="Sentiment Timeline" class="w-full h-full object-contain">
-            </div>
-        </div>
-
-        <!-- Word Cloud -->
-        <div class="bg-gray-800 rounded-xl shadow-lg p-6 transform transition-all duration-300 hover:bg-gray-700">
-            <h2 class="text-xl font-semibold text-white mb-6">Topic Cloud</h2>
-            <div class="aspect-[4/3] bg-gray-900/50 rounded-lg p-4">
-                <img id="historical-wordcloud" src="" alt="Word Cloud" class="w-full h-full object-contain">
-            </div>
-        </div>
-    </div>
-
-    <!-- Sentiment Distribution -->
-    <div class="bg-gray-800 rounded-xl shadow-lg p-6 mb-8 transform transition-all duration-300 hover:bg-gray-700">
-        <h2 class="text-xl font-semibold text-white mb-6">Sentiment Distribution</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div class="text-center p-6 bg-gray-900/50 rounded-lg">
-                <div class="text-3xl font-bold text-green-400 mb-2" id="positive-percentage">0%</div>
-                <div class="text-sm text-gray-400">Positive Sentiment</div>
-            </div>
-            <div class="text-center p-6 bg-gray-900/50 rounded-lg">
-                <div class="text-3xl font-bold text-blue-400 mb-2" id="neutral-percentage">0%</div>
-                <div class="text-sm text-gray-400">Neutral Sentiment</div>
-            </div>
-            <div class="text-center p-6 bg-gray-900/50 rounded-lg">
-                <div class="text-3xl font-bold text-red-400 mb-2" id="negative-percentage">0%</div>
-                <div class="text-sm text-gray-400">Negative Sentiment</div>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
-// Replace the existing scripts block with:
 {% block scripts %}
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 <script>
-    const socket = io();
-    let totalTweets = 0;
-    const sentimentCounts = { Positive: 0, Negative: 0, Neutral: 0 };
-
-    // Load historical data on page load
-    fetch('/get_historical_stats')
-        .then(response => response.json())
-        .then(data => {
-            totalTweets = data.total_tweets;
-            Object.assign(sentimentCounts, data.sentiment_counts);
-            updateStats();
-            if (data.peak_time) {
-                document.getElementById('peak-time').textContent = 
-                    new Date(data.peak_time[0]).toLocaleTimeString();
-            }
-        });
-
-    socket.on('new_tweet', function(data) {
-        totalTweets++;
-        sentimentCounts[data.sentiment]++;
-        updateStats();
+    // Enhanced socket configuration
+    const socket = io({
+        transports: ['websocket'],
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000
     });
 
-    function updateStats() {
-        document.getElementById('total-tweets').textContent = totalTweets;
+    let timelineData = {
+        timestamps: [],
+        positive: [],
+        negative: [],
+        neutral: []
+    };
 
-        for (const sentiment of ['Positive', 'Negative', 'Neutral']) {
-            const percentage = ((sentimentCounts[sentiment] / totalTweets) * 100).toFixed(1);
-            document.getElementById(`${sentiment.toLowerCase()}-percentage`).textContent = `${percentage}%`;
+    // Enhanced connection handling
+    socket.on('connect', function() {
+        console.log('Socket connected successfully');
+        socket.emit('request_initial_data');  // Request initial data
+    });
+
+    socket.on('reconnect', function(attemptNumber) {
+        console.log('Reconnected after ' + attemptNumber + ' attempts');
+        loadInitialData();  // Reload data after reconnection
+    });
+
+    // Enhanced real-time update handlers
+    socket.on('new_tweet', function(data) {
+        console.log('New tweet received:', data);
+        
+        // Update sentiment counts
+        sentimentCounts[data.sentiment]++;
+        updateSentimentBars();
+        
+        // Update timeline
+        const timestamp = new Date(data.created_at);
+        timelineData.timestamps.push(timestamp);
+        timelineData.positive.push(data.sentiment === 'Positive' ? 1 : 0);
+        timelineData.negative.push(data.sentiment === 'Negative' ? 1 : 0);
+        timelineData.neutral.push(data.sentiment === 'Neutral' ? 1 : 0);
+        
+        updateSentimentTimeline(timelineData);
+    });
+
+    // Enhanced timeline update function
+    function updateSentimentTimeline(data) {
+        const traces = [
+            {
+                name: 'Positive',
+                x: data.timestamps,
+                y: data.positive,
+                type: 'scatter',
+                line: { color: '#10B981' }
+            },
+            {
+                name: 'Negative',
+                x: data.timestamps,
+                y: data.negative,
+                type: 'scatter',
+                line: { color: '#EF4444' }
+            },
+            {
+                name: 'Neutral',
+                x: data.timestamps,
+                y: data.neutral,
+                type: 'scatter',
+                line: { color: '#3B82F6' }
+            }
+        ];
+
+        const layout = {
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            font: { color: '#9CA3AF' },
+            margin: { l: 50, r: 20, t: 20, b: 50 },
+            xaxis: {
+                gridcolor: '#374151',
+                zerolinecolor: '#374151',
+                type: 'date'
+            },
+            yaxis: {
+                gridcolor: '#374151',
+                zerolinecolor: '#374151'
+            },
+            showlegend: true,
+            legend: {
+                bgcolor: 'rgba(0,0,0,0)',
+                font: { color: '#9CA3AF' }
+            }
+        };
+
+        Plotly.newPlot('sentiment-timeline', traces, layout);
+    }
+
+    // Enhanced error handling for data loading
+    async function loadInitialData(retryCount = 3) {
+        try {
+            const responses = await Promise.allSettled([
+                fetch('/get_historical_wordcloud'),
+                fetch('/get_historical_stats'),
+                fetch('/get_tweets')
+            ]);
+
+            responses.forEach((response, index) => {
+                if (response.status === 'rejected') {
+                    console.error(`Failed to fetch data from endpoint ${index}:`, response.reason);
+                }
+            });
+
+            const [cloudData, statsData, tweets] = await Promise.all(
+                responses
+                    .filter(r => r.status === 'fulfilled')
+                    .map(r => r.value.json())
+            );
+
+            if (cloudData?.image) {
+                updateWordCloud(cloudData);
+            }
+
+            if (statsData?.timeline_data) {
+                timelineData = statsData.timeline_data;
+                updateSentimentTimeline(timelineData);
+            }
+
+            if (tweets?.length > 0) {
+                tweets.forEach(tweet => {
+                    sentimentCounts[tweet.sentiment] = (sentimentCounts[tweet.sentiment] || 0) + 1;
+                });
+                updateSentimentBars();
+            }
+
+        } catch (error) {
+            console.error('Error loading initial data:', error);
+            if (retryCount > 0) {
+                console.log(`Retrying... (${retryCount} attempts left)`);
+                setTimeout(() => loadInitialData(retryCount - 1), 2000);
+            }
         }
-
-        const avgSentiment = calculateAverageSentiment();
-        document.getElementById('avg-sentiment').textContent = avgSentiment;
     }
 
-    function calculateAverageSentiment() {
-        if (totalTweets === 0) return '-';
-        if (sentimentCounts.Positive > sentimentCounts.Negative) return '😊';
-        if (sentimentCounts.Negative > sentimentCounts.Positive) return '😔';
-        return '😐';
-    }
+    socket.on('disconnect', function() {
+        console.log('Socket disconnected');
+    });
+
+    socket.on('error', function(error) {
+        console.error('Socket error:', error);
+    });
+
+    // Real-time update handlers
+    socket.on('new_tweet', function(data) {
+        console.log('New tweet received:', data);
+        sentimentCounts[data.sentiment]++;
+        updateSentimentBars();
+        updateSentimentTimeline(data);
+    });
+
+    socket.on('trending_update', function(trending) {
+        console.log('Trending update received:', trending);
+        updateTrendingTopics(trending);
+    });
 
     socket.on('wordcloud_update', function(data) {
-        if (data.historical_image) {
-            const img = document.getElementById('historical-wordcloud');
-            img.src = "data:image/png;base64," + data.historical_image;
-        }
+        console.log('Wordcloud update received');
+        updateWordCloud(data);
     });
-    // In the scripts section, add this line after socket initialization
-    socket.connect();  // Ensure connection is established
 
-    // Add this to periodically refresh the sentiment timeline
-    setInterval(() => {
-        document.querySelector('img[src="/trends_chart"]').src = 
-            '/trends_chart?' + new Date().getTime();
-    }, 30000);
+    socket.on('sentiment_update', function(sentiments) {
+        console.log('Sentiment update received:', sentiments);
+        updateSentimentDistribution(sentiments);
+    });
 
-    socket.connect();
+    // Update functions
+    function updateTrendingTopics(trending) {
+        const trendingTopics = document.getElementById('trending-topics');
+        if (trendingTopics && trending && trending.length > 0) {
+            trendingTopics.innerHTML = trending.map(item => `
+                <div class="px-4 py-2 bg-gray-900/50 rounded-full text-sm text-gray-200">
+                    ${item.tag}
+                    <span class="ml-1 text-blue-400">(${item.count})</span>
+                </div>
+            `).join('');
+        }
+    }
+
+    function updateWordCloud(data) {
+        const img = document.getElementById('topic-cloud');
+        const placeholder = document.getElementById('topic-cloud-placeholder');
+        if (data && data.image) {
+            img.src = "data:image/png;base64," + data.image;
+            img.style.display = "block";
+            placeholder.style.display = "none";
+        }
+    }
+
+    function updateSentimentDistribution(sentiments) {
+        const total = Object.values(sentiments).reduce((a, b) => a + b, 0);
+        Object.entries(sentiments).forEach(([sentiment, count]) => {
+            const countElement = document.getElementById(`${sentiment.toLowerCase()}-count`);
+            const barElement = document.getElementById(`${sentiment.toLowerCase()}-bar`);
+            
+            if (countElement && barElement) {
+                countElement.textContent = count;
+                const percentage = total > 0 ? (count / total * 100) : 0;
+                barElement.style.width = `${percentage}%`;
+            }
+        });
+    }
+
+    // Load initial data with retry mechanism
+    async function loadInitialData(retryCount = 3) {
+        try {
+            const [cloudResponse, statsResponse, tweetsResponse] = await Promise.all([
+                fetch('/get_historical_wordcloud'),
+                fetch('/get_historical_stats'),
+                fetch('/get_tweets')
+            ]);
+
+            const [cloudData, statsData, tweets] = await Promise.all([
+                cloudResponse.json(),
+                statsResponse.json(),
+                tweetsResponse.json()
+            ]);
+
+            if (cloudData.image) {
+                updateWordCloud(cloudData);
+            }
+
+            if (statsData.timeline_data) {
+                updateSentimentTimeline(statsData.timeline_data);
+            }
+
+            if (tweets && tweets.length > 0) {
+                tweets.forEach(tweet => {
+                    sentimentCounts[tweet.sentiment]++;
+                });
+                updateSentimentBars();
+            }
+
+        } catch (error) {
+            console.error('Error loading initial data:', error);
+            if (retryCount > 0) {
+                console.log(`Retrying... (${retryCount} attempts left)`);
+                setTimeout(() => loadInitialData(retryCount - 1), 2000);
+            }
+        }
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Page loaded, connecting to socket...');
+        socket.connect();
+    });
 </script>
 {% endblock %}
