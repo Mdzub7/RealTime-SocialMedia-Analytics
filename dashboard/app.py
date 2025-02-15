@@ -37,9 +37,73 @@ socketio = SocketIO(
     engineio_logger=True,
     ping_timeout=60,
     ping_interval=25,
-    async_mode='threading',
-    transport=['polling', 'websocket']
+    async_mode='threading'  # Remove transport list to allow automatic negotiation
 )
+
+# Update the consume_kafka function
+def consume_kafka():
+    while True:
+        try:
+            print("Attempting to connect to Kafka...")
+            consumer = KafkaConsumer(
+                KAFKA_TOPIC,
+                bootstrap_servers=KAFKA_BROKER,
+                auto_offset_reset='earliest',
+                value_deserializer=lambda v: json.loads(v.decode('utf-8'))
+            )
+            print("✅ Successfully connected to Kafka")
+            
+            for message in consumer:
+                try:
+                    tweet = message.value
+                    print(f"📨 Received tweet: {tweet['text'][:50]}...")
+                    
+                    # Get thread-local session
+                    session = SessionLocal()
+                    try:
+                        # Create and add tweet to session
+                        tweet_obj = Tweet(text=tweet["text"], sentiment=tweet["sentiment"])
+                        session.add(tweet_obj)
+                        session.flush()
+                        session.refresh(tweet_obj)
+                        
+                        # Get the tweet data before committing
+                        tweet_data = {
+                            "id": str(tweet_obj.id),
+                            "text": tweet_obj.text,
+                            "sentiment": tweet_obj.sentiment,
+                            "created_at": tweet_obj.created_at.isoformat()
+                        }
+                        
+                        # Commit the transaction
+                        session.commit()
+                        
+                        # Emit the tweet data after successful commit
+                        socketio.emit('new_tweet', tweet_data, namespace='/tweets')
+                        print("✅ Tweet saved and emitted to clients")
+                        
+                        # Emit analytics update
+                        emit_analytics_update()
+                        
+                    except Exception as e:
+                        session.rollback()
+                        logger.error(f"Database error: {str(e)}")
+                        raise
+                    finally:
+                        session.remove()  # Remove thread-local session
+                        
+                except Exception as e:
+                    print(f"❌ Error processing message: {str(e)}")
+                    continue
+                    
+        except Exception as e:
+            print(f"❌ Kafka consumer error: {str(e)}")
+            time.sleep(5)
+
+# Add a connection event handler with namespace
+@socketio.on('connect', namespace='/tweets')
+def handle_tweets_connect():
+    print("Client connected to tweets namespace")
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -90,7 +154,7 @@ def test_route():
 def get_live_tweets():
     try:
         session = SessionLocal()
-        tweets = session.query(Tweet).order_by(Tweet.created_at.desc()).limit(50).all()
+        tweets = session.query(Tweet).order_by(Tweet.created_at.desc()).all()  # Removed the limit(50)
         if not tweets:
             return jsonify([])
             
@@ -264,37 +328,41 @@ from flask_socketio import emit
 
 # Update the consume_kafka function
 def consume_kafka():
-    while True:
+    running = True
+    while running:
         try:
             print("Attempting to connect to Kafka...")
             consumer = KafkaConsumer(
                 KAFKA_TOPIC,
                 bootstrap_servers=KAFKA_BROKER,
                 auto_offset_reset='earliest',
-                value_deserializer=lambda v: json.loads(v.decode('utf-8'))
+                value_deserializer=lambda v: json.loads(v.decode('utf-8')),
+                consumer_timeout_ms=1000  # Add timeout to allow checking for shutdown
             )
             print("✅ Successfully connected to Kafka")
             
-            for message in consumer:
-                try:
-                    tweet = message.value
-                    print(f"📨 Received tweet: {tweet['text'][:50]}...")
-                    
-                    saved_tweet = save_tweet(tweet["text"], tweet["sentiment"])
-                    
-                    # Emit to all connected clients
-                    socketio.emit('new_tweet', {
-                        "id": str(saved_tweet.id),
-                        "text": tweet["text"],
-                        "sentiment": tweet["sentiment"],
-                        "created_at": saved_tweet.created_at.isoformat()
-                    }, broadcast=True)
-                    
-                    print("✅ Tweet emitted to clients")
-                    
-                except Exception as e:
-                    print(f"❌ Error processing message: {str(e)}")
-                    continue
+            try:
+                for message in consumer:
+                    try:
+                        tweet = message.value
+                        print(f"📨 Received tweet: {tweet['text'][:50]}...")
+                        
+                        saved_tweet = save_tweet(tweet["text"], tweet["sentiment"])
+                        
+                        socketio.emit('new_tweet', {
+                            "id": str(saved_tweet.id),
+                            "text": tweet["text"],
+                            "sentiment": tweet["sentiment"],
+                            "created_at": saved_tweet.created_at.isoformat()
+                        }, namespace='/tweets')
+                        
+                        print("✅ Tweet emitted to clients")
+                        
+                    except Exception as e:
+                        print(f"❌ Error processing message: {str(e)}")
+                        continue
+            finally:
+                consumer.close()
                     
         except Exception as e:
             print(f"❌ Kafka consumer error: {str(e)}")

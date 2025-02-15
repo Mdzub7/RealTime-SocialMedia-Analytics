@@ -3,65 +3,75 @@ from textblob import TextBlob
 import json
 import re
 import time
+import signal
+import sys
 
 # Kafka Configuration
 INPUT_TOPIC = "social_media_data"
 OUTPUT_TOPIC = "processed_tweets"
 BROKER = "localhost:9092"
 
-def clean_tweet(text):
-    text = re.sub(r"http\S+", "", text)  # Remove URLs
-    text = re.sub(r"[^a-zA-Z\s]", "", text)  # Remove special characters
-    text = text.lower().strip()  # Convert to lowercase
-    return text
+# Global flag for graceful shutdown
+running = True
 
-def get_sentiment(text):
-    analysis = TextBlob(text)
-    polarity = analysis.sentiment.polarity
-    if polarity > 0:
-        return "Positive"
-    elif polarity < 0:
-        return "Negative"
-    else:
-        return "Neutral"
+def signal_handler(signum, frame):
+    global running
+    print("Received shutdown signal, cleaning up...")
+    running = False
+
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 def process_tweets():
-    # Initialize Kafka Consumer
-    consumer = KafkaConsumer(
-        INPUT_TOPIC,
-        bootstrap_servers=BROKER,
-        auto_offset_reset='earliest',
-        value_deserializer=lambda v: json.loads(v.decode('utf-8'))
-    )
-
-    # Initialize Kafka Producer
-    producer = KafkaProducer(
-        bootstrap_servers=BROKER,
-        value_serializer=lambda v: json.dumps(v).encode('utf-8')
-    )
-
-    print("Starting tweet processing...")
     try:
-        for message in consumer:
-            tweet = message.value
-            
-            # Process the tweet
-            processed_tweet = {
-                "id": tweet["id"],
-                "text": clean_tweet(tweet["text"]),
-                "sentiment": get_sentiment(clean_tweet(tweet["text"])),
-                "created_at": tweet["created_at"]
-            }
-            
-            # Send to output topic
-            producer.send(OUTPUT_TOPIC, processed_tweet)
-            print(f"Processed tweet: {processed_tweet['text'][:100]}... | Sentiment: {processed_tweet['sentiment']}")
-            
-    except KeyboardInterrupt:
-        print("\nProcessing stopped by user")
+        consumer = KafkaConsumer(
+            INPUT_TOPIC,
+            bootstrap_servers=BROKER,
+            auto_offset_reset='latest',
+            enable_auto_commit=True,
+            consumer_timeout_ms=1000,  # 1 second timeout
+            value_deserializer=lambda x: json.loads(x.decode('utf-8'))
+        )
+        
+        producer = KafkaProducer(
+            bootstrap_servers=BROKER,
+            value_serializer=lambda x: json.dumps(x).encode('utf-8')
+        )
+        
+        print("✅ Connected to Kafka, starting processing...")
+        
+        while running:
+            try:
+                messages = consumer.poll(timeout_ms=1000)
+                for topic_partition, msgs in messages.items():
+                    for msg in msgs:
+                        tweet_text = msg.value.get('text', '')
+                        sentiment = analyze_sentiment(tweet_text)
+                        
+                        processed_tweet = {
+                            'text': tweet_text,
+                            'sentiment': sentiment
+                        }
+                        
+                        producer.send(OUTPUT_TOPIC, processed_tweet)
+                        print(f"Processed tweet: {tweet_text[:50]}...")
+                        
+            except Exception as e:
+                print(f"Error processing message: {str(e)}")
+                continue
+                
+    except Exception as e:
+        print(f"Kafka error: {str(e)}")
     finally:
-        consumer.close()
-        producer.close()
+        try:
+            consumer.close()
+            producer.close()
+        except:
+            pass
 
 if __name__ == "__main__":
-    process_tweets()
+    try:
+        process_tweets()
+    except KeyboardInterrupt:
+        print("Shutting down...")
+        running = False
