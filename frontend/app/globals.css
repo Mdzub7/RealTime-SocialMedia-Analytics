@@ -1,0 +1,156 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 0%;
+    --foreground-rgb: 255, 255, 255;  /* Changed from 100% to 0% to make text black */
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+    --card-foreground: 0 0% 0%;  /* Changed to black for better visibility */
+    --card: 0 0% 3%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 3%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 0 0% 90%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 65%;
+    --accent: 0 0% 25%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 0 0% 40%;
+    --radius: 0.5rem;
+    --analytics-primary: 230 60% 50%;    /* Deep blue */
+    --analytics-secondary: 280 50% 45%;   /* Purple */
+    --analytics-accent: 150 50% 45%;      /* Teal */
+    --analytics-text: 0 0% 90%;          /* Light gray for text */
+    --chart-background: 0 0% 10%;        /* Dark background for charts */
+    
+    /* Analytics & Compare Page Colors */
+    --chart-primary: 203 89% 53%;    /* Twitter Blue #1DA1F2 */
+    --chart-secondary: 16 100% 50%;   /* Reddit Red #FF4500 */
+    --chart-accent: 16 100% 50%;      /* Also Reddit Red */
+    --chart-highlight: 203 89% 53%;   /* Also Twitter Blue */
+    --chart-contrast: 203 89% 53%;    /* Also Twitter Blue */
+    
+    /* Chart Background Gradients */
+    --chart-gradient-1: 203 89% 20%;  /* Darker Twitter Blue */
+    --chart-gradient-2: 16 100% 20%;  /* Darker Reddit Red */
+  }
+}
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+    to bottom,
+    rgb(var(--background-start-rgb)),
+    rgb(var(--background-end-rgb))
+  );
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+.my-masonry-grid {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  margin-left: -30px;
+  width: auto;
+}
+
+.my-masonry-grid_column {
+  padding-left: 30px;
+  background-clip: padding-box;
+}
+
+.my-masonry-grid_column > div {
+  margin-bottom: 30px;
+}
+
+.tweet-card {
+  @apply bg-primary/10 backdrop-blur-md rounded-lg p-6 shadow-lg;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glassmorphism {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+}
+
+.text-primary {
+  color: rgb(var(--foreground-rgb));
+}
+
+.text-accent {
+  color: #4CAF50;
+}
+
+.text-grey{
+  color: grey;
+}
+
+.analytics-card {
+  background: rgba(30, 30, 40, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  @apply rounded-lg p-4;
+}
+
+.analytics-text {
+  color: hsl(var(--analytics-text));
+}
+
+.chart-container {
+  background: hsl(var(--chart-background));
+  @apply rounded-lg p-4;
+}
+
+/* Add these new chart-specific classes */
+.chart-element-primary {
+  color: hsl(var(--chart-primary));
+  fill: hsl(var(--chart-primary));
+}
+
+.chart-element-secondary {
+  color: hsl(var(--chart-secondary));
+  fill: hsl(var(--chart-secondary));
+}
+
+.chart-element-accent {
+  color: hsl(var(--chart-accent));
+  fill: hsl(var(--chart-accent));
+}
+
+.chart-element-highlight {
+  color: hsl(var(--chart-highlight));
+  fill: hsl(var(--chart-highlight));
+}
+
+.chart-element-contrast {
+  color: hsl(var(--chart-contrast));
+  fill: hsl(var(--chart-contrast));
+}
+
+.chart-gradient-bg {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--chart-gradient-1)) 0%,
+    hsl(var(--chart-gradient-2)) 100%
+  );
+}
+
