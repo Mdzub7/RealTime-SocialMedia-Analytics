@@ -22,88 +22,52 @@ from database import save_tweet, SessionLocal, Tweet, init_db
 
 # Constants
 KAFKA_TOPIC = 'social_media_data'
-KAFKA_BROKER = 'localhost:9092'
-word_counter = Counter()
+# Update KAFKA_BROKER to use Docker service name
+KAFKA_BROKER = 'kafka:9092'  # Changed from localhost:9092
 
-# Flask and SocketIO setup
-app = Flask(__name__)
-CORS(app)
-app.config['SECRET_KEY'] = 'secret!'
-# Update SocketIO initialization
-socketio = SocketIO(
-    app,
-    cors_allowed_origins="*",
-    logger=True,
-    engineio_logger=True,
-    ping_timeout=60,
-    ping_interval=25,
-    async_mode='threading'  # Remove transport list to allow automatic negotiation
-)
-
-# Update the consume_kafka function
-def consume_kafka():
-    while True:
-        try:
-            print("Attempting to connect to Kafka...")
-            consumer = KafkaConsumer(
-                KAFKA_TOPIC,
-                bootstrap_servers=KAFKA_BROKER,
-                auto_offset_reset='earliest',
-                value_deserializer=lambda v: json.loads(v.decode('utf-8'))
-            )
-            print("✅ Successfully connected to Kafka")
+# Update the get_live_tweets route
+@app.route("/api/tweets/live")
+def get_live_tweets():
+    session = SessionLocal()
+    try:
+        tweets = session.query(Tweet)\
+            .order_by(Tweet.created_at.desc())\
+            .all()
             
-            for message in consumer:
-                try:
-                    tweet = message.value
-                    print(f"📨 Received tweet: {tweet['text'][:50]}...")
-                    
-                    # Get thread-local session
-                    session = SessionLocal()
-                    try:
-                        # Create and add tweet to session
-                        tweet_obj = Tweet(text=tweet["text"], sentiment=tweet["sentiment"])
-                        session.add(tweet_obj)
-                        session.flush()
-                        session.refresh(tweet_obj)
-                        
-                        # Get the tweet data before committing
-                        tweet_data = {
-                            "id": str(tweet_obj.id),
-                            "text": tweet_obj.text,
-                            "sentiment": tweet_obj.sentiment,
-                            "created_at": tweet_obj.created_at.isoformat()
-                        }
-                        
-                        # Commit the transaction
-                        session.commit()
-                        
-                        # Emit the tweet data after successful commit
-                        socketio.emit('new_tweet', tweet_data, namespace='/tweets')
-                        print("✅ Tweet saved and emitted to clients")
-                        
-                        # Emit analytics update
-                        emit_analytics_update()
-                        
-                    except Exception as e:
-                        session.rollback()
-                        logger.error(f"Database error: {str(e)}")
-                        raise
-                    finally:
-                        session.remove()  # Remove thread-local session
-                        
-                except Exception as e:
-                    print(f"❌ Error processing message: {str(e)}")
-                    continue
-                    
-        except Exception as e:
-            print(f"❌ Kafka consumer error: {str(e)}")
-            time.sleep(5)
+        return jsonify([{
+            "id": str(tweet.id),
+            "text": tweet.text,
+            "sentiment": tweet.sentiment,
+            "created_at": tweet.created_at.isoformat()
+        } for tweet in tweets])
+        
+    except Exception as e:
+        logger.error(f"Error fetching tweets: {str(e)}")
+        return jsonify([])  # Return empty list instead of error
+    finally:
+        session.close()
 
-# Add a connection event handler with namespace
+# Update WebSocket connection handler
 @socketio.on('connect', namespace='/tweets')
 def handle_tweets_connect():
     print("Client connected to tweets namespace")
+    # Send initial data on connection
+    session = SessionLocal()
+    try:
+        tweets = session.query(Tweet)\
+            .order_by(Tweet.created_at.desc())\
+            .limit(50)\
+            .all()
+        
+        for tweet in tweets:
+            socketio.emit('new_tweet', {
+                "id": str(tweet.id),
+                "text": tweet.text,
+                "sentiment": tweet.sentiment,
+                "created_at": tweet.created_at.isoformat()
+            }, namespace='/tweets')
+    finally:
+        session.close()
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -152,21 +116,31 @@ def test_route():
 
 @app.route("/api/tweets/live")
 def get_live_tweets():
+    session = SessionLocal()
     try:
-        session = SessionLocal()
-        tweets = session.query(Tweet).order_by(Tweet.created_at.desc()).all()  # Removed the limit(50)
-        if not tweets:
-            return jsonify([])
+        # Check database connection first
+        session.execute(text("SELECT 1"))
+        
+        # Get tweets with error handling
+        tweets = session.query(Tweet)\
+            .order_by(Tweet.created_at.desc())\
+            .limit(100)\
+            .all()
             
-        return jsonify([{
+        # Transform to JSON-safe format
+        tweet_list = [{
             "id": str(tweet.id),
             "text": tweet.text,
             "sentiment": tweet.sentiment,
             "created_at": tweet.created_at.isoformat()
-        } for tweet in tweets])
+        } for tweet in (tweets or [])]
+        
+        return jsonify(tweet_list)
+        
     except Exception as e:
-        logger.error(f"Error fetching tweets: {str(e)}")
-        return jsonify({"error": "Database error"}), 500
+        logger.error(f"Database error in get_live_tweets: {str(e)}")
+        session.rollback()
+        return jsonify({"error": str(e)}), 500
     finally:
         session.close()
 

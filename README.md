@@ -1,61 +1,131 @@
 # Real-Time Social Media Analysis
 
-A real-time social media analytics dashboard that processes Twitter data using Apache Flink, Kafka, and PostgreSQL, featuring sentiment analysis and trend visualization.
+RealTime Social Media Analytics is a web application that provides live and historical analysis of tweets. It uses a combination of Flask, Socket.IO, Kafka, and React to deliver real-time updates and insights.
 
-![Real-Time Dashboard Demo](assets/img1.jpeg)
-![Real-Time Dashboard Demo](assets/img2.jpeg)
-![Real-Time Dashboard Demo](assets/img3.jpeg)
+# Demo
+![Real-Time Dashboard Demo](assets/img1.png)
+![Real-Time Dashboard Demo](assets/img2.png)
+![Real-Time Dashboard Demo](assets/img3.png)
+![Real-Time Dashboard Demo](assets/img4.png)
+![Real-Time Dashboard Demo](assets/img5.png)
+![Real-Time Dashboard Demo](assets/img6.png)
+
+
+## Table of Contents
+
+1. [Overview](#overview)
+2. [Features](#features)
+3. [Installation](#installation)
+4. [Usage](#usage)
+5. [Project Structure](#project-structure)
+6. [Contributing](#contributing)
+7. [License](#license)
+
+## Overview
+
+This project is designed to analyze tweets in real-time, providing insights into trending topics, sentiment analysis, and more. It leverages Kafka for message streaming, Flask for the backend, and React for the frontend.
+
 
 ## Features
 
-- Real-time tweet processing and sentiment analysis
-- Interactive dashboard with dark theme
-- Live word cloud visualization
-- Sentiment distribution tracking
-- Historical data persistence
-- Trend analysis with timeline visualization
+- **Real-time Tweet Streaming**: View live tweets as they are processed.
+- **Historical Data Analysis**: Access historical tweet data for deeper insights.
+- **Sentiment Analysis**: Analyze the sentiment of tweets.
+- **Responsive Design**: Optimized for both desktop and mobile devices.
 
 
-## Technology Stack
+## Installation
 
-- **Backend**: Python, Flask, SQLAlchemy
-- **Frontend**: TailwindCSS, Socket.IO
-- **Data Processing**: Apache Flink
-- **Message Queue**: Apache Kafka
-- **Database**: PostgreSQL
-- **Containerization**: Docker
+### Prerequisites
 
-## Setup and Installation
+- Node.js and npm
+- Python 3.x
+- Docker and Docker Compose
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/RealTime-SocialMedia-Analysis.git
-cd RealTime-SocialMedia-Analysis
-```
+### Setup
 
-2. Create and activate virtual environment
+1. **Clone the repository:**
 
-python -m venv venv
-source venv/bin/activate  # For Unix/macOS
+   ```bash
+   git clone https://github.com/yourusername/RealTime-SocialMedia-Analytics.git
+   cd RealTime-SocialMedia-Analytics
 
-3. Install dependencies
 
-pip install -r requirements.txt
+2. Backend Setup:
+   
+   - Navigate to the backend directory and set up the virtual environment:
+     
+     ```bash
+     cd dashboard
+     python -m venv venv
+     source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+      ```
+     ```
+   - Install the required Python packages:
+     
+     ```bash
+     pip install -r requirements.txt
+      ```
+   - Start the backend services using Docker Compose:
+     
+     ```bash
+     docker-compose up -d
+      ```
+3. Frontend Setup:
+   
+   - Navigate to the frontend directory:
+     
+     ```bash
+     cd ../frontend
+      ```
+   - Install the required npm packages:
+     
+     ```bash
+     npm install
+      ```
+   - Start the React development server:
+     
+     ```bash
+     npm start
+      ```
 
-4. Set up environment variables
+## Usage
+- Access the application at http://localhost:3000 .
+- View live tweets and historical data.
+- Analyze tweet sentiment and trends.
 
-cp .env.example .env
-# Edit .env file with your Twitter API credentials
+## Project Structure
+```plaintext
+```RealTime-SocialMedia-Analytics/
+│
+├── dashboard/
+│   ├── app.py
+│   ├── database.py
+│   ├── requirements.txt
+│   └── ...
+│
+├── frontend/
+│   ├── app/
+│   │   ├── components/
+│   │   ├── hooks/
+│   │   ├── tweets/
+│   │   └── ...
+│   ├── public/
+│   ├── src/
+│   ├── package.json
+│   └── ...
+│
+└── assets/
+    └── images/
+        ├── img1.png
+        ├── img2.png
+        ├── img3.png
+        ├── img4.png
+        ├── img5.png
+        └── img6.png
 
-5. Start Kafka and run the producer and consumer
-
-docker-compose up -d
-
-# Terminal 1  
-python kafka/consumer.py
-
-# Terminal 2
-python kafka/producer.py
+## Contributing
+Contributions are welcome! Please fork the repository and submit a pull request for any improvements.
 
 ## Current Features
 - Real-time tweet collection using Twitter API v2
@@ -69,8 +139,12 @@ python kafka/producer.py
 - Advanced filtering options
 - Database integration
 - Real-time analytics dashboard
+
 ## License
 MIT License
+
+This `README.md` provides a comprehensive overview of your project, including setup instructions, usage, and visual references. Adjust the content as needed to fit your specific project details and repository structure.
+
 
 ## Author
 Mohammed Zubair A
